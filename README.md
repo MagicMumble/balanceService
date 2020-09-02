@@ -3,7 +3,7 @@ micro service for dealing with users' balance
 
 This microservice was written for Unix-like systems on Ubuntu 16.0 using Golang and MySQL database. There are several main entities:
 
-user, cahrge, writeOff ........
+user, charge, writeOff ........
 
 Request for adding new user:
     
@@ -31,7 +31,7 @@ Request for adding new user:
     curl --header "Content-Type: application/json" \
      --request POST \
      --data '{"fromID": "1", "toID": "2", "sum": "100"}' \
-     http://localhost:9000/users/tranfer
+     http://localhost:9000/users/transfer
      
  Request for getting one user's current balance:
  
