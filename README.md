@@ -60,3 +60,10 @@ Request for adding new user:
      --request POST \
      --data '{"userID": "1"}' \
      http://localhost:9000/users/getWriteOffReport
+     
+ Request for getting report with sorted by date or sum charge/write off transactions of one user:
+ 
+    curl --header "Content-Type: application/json" \
+     --request POST \
+     --data '{"userID": "1"}' \
+     http://localhost:9000/users/getWriteOffReport?sort=date
