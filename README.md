@@ -1,9 +1,20 @@
 # balanceService
 micro service for dealing with users' balance
 
-This microservice was written for Unix-like systems on Ubuntu 16.0 using Golang and MySQL database. There are several main entities:
+This microservice was written for Unix-like systems on Ubuntu 16.0 using Golang and MySQL database. There are three main entities in the database: user, charge, writeOff tables. The entity user stores username and current balance. The entity charge consists from fields user(id), fromID (who the money came from), sum (amount of money charged), finalBalance (after completing transaction) and field info with some information. The table writeOff is similar to table charge. Therefore the type of relationship between tables user-charge (user-writeOff) is one to many. 
 
-user, charge, writeOff ........
+To use this app you need to install mysql server. Firstly install it with command:
+
+    sudo apt-get install mysql-community-server
+Then start a server and create user with specified domen and password:
+
+    udo service mysql start
+    mysql -u root -p                                                    #enter your root rassword
+    create user 'user1'@'localhost' identified by 'password1';
+Last step is creating your databse and grant all access to the user:
+
+    create database testdb;
+    grant all on testdb.* to 'user1';
 
 Request for adding new user:
     
@@ -16,21 +27,21 @@ Request for adding new user:
  
      curl --header "Content-Type: application/json" \
      --request POST \
-     --data '{"userID": "1", "sum": "100"}' \
+     --data '{"userID": "1", "sum": "100", "info": "scolarship"}' \
      http://localhost:9000/users/charge
      
  Request for writing off some money from the user bank account:
  
      curl --header "Content-Type: application/json" \
      --request POST \
-     --data '{"userID": "1", "sum": "100"}' \
+     --data '{"userID": "1", "sum": "100", "info": "debt in bank"}' \
      http://localhost:9000/users/writeOff
      
  Request for transfering some amount of money from one user to another:
  
     curl --header "Content-Type: application/json" \
      --request POST \
-     --data '{"fromID": "1", "toID": "2", "sum": "100"}' \
+     --data '{"fromID": "1", "toID": "2", "sum": "100", "info": "for dinner inrestaurant"}' \
      http://localhost:9000/users/transfer
      
  Request for getting one user's current balance:
@@ -45,7 +56,7 @@ Request for adding new user:
     curl --header "Content-Type: application/json" \
      --request POST \
      --data '{"userID": "1"}' \
-     http://localhost:9000/users/getConvertedBalance?currency=USD
+     http://localhost:9000/users/getBalance?currency=USD
      
  Request for getting report with all charge transactions of one user:
  
