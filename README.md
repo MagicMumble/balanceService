@@ -6,17 +6,31 @@ This microservice was written for Unix-like systems on Ubuntu 16.0 using Golang 
 To use this app you need to install mysql server. Firstly install it with command:
 
     sudo apt-get install mysql-community-server
+    
 Then start a server and create user with specified domen and password:
 
     udo service mysql start
     mysql -u root -p                                                    #enter your root rassword
     create user 'user1'@'localhost' identified by 'password1';
+    
 Last step is creating your databse and grant all access to the user:
 
     create database testdb;
     grant all on testdb.* to 'user1';
+    
+To create tables inside new database run file `createDB.go` from `balanceService/db`:
 
-Request for adding new user:
+    go build createDB.go && ./createDB
+    
+To be able to get currency rates from page `https://exchangeratesapi.io/` and convert balance you need to register there and get the KEY (visit page `page https://openexchangerates.org/signup`). To use mySql driver in go program install "github.com/go-sql-driver/mysql" with the command:
+
+    go get -u "github.com/go-sql-driver/mysql"
+
+Run the server from `balanceService`:
+
+    go build server.go && ./server
+
+Let's take a look at the API methods of this app. Request for adding new user:
     
     curl --header "Content-Type: application/json" \
      --request POST \
