@@ -22,12 +22,14 @@ type User struct {
 type TransferRequest struct {
 	UserID string `json:"userID"`
 	Sum string `json:"sum"`
+	Info string `json:"info"`
 }
 
 type TransferFromToRequest struct {
 	FromID string `json:"fromID"`
 	ToID string `json:"toID"`
 	Sum    string `json:"sum"`
+	Info string `json:"info"`
 }
 
 type UserID struct {
@@ -39,6 +41,7 @@ type Response struct {
 }
 
 func sendResponse(w http.ResponseWriter, text string) {
+
 	w.Header().Set("Content-Type", "application/json")        //вернёт id нового пользователя
 	data := Response {
 		Response: text,
@@ -47,10 +50,10 @@ func sendResponse(w http.ResponseWriter, text string) {
 }
 
 func checkHeader(w http.ResponseWriter, req *http.Request) *json.Decoder {
+
 	contType := req.Header.Get("Content-Type")
 	if contType != "" && contType != "application/json" {
-		msg := "Content-Type header is not application/json"
-		http.Error(w, msg, http.StatusUnsupportedMediaType)
+		http.Error(w, "Content-Type header is not application/json", http.StatusUnsupportedMediaType)
 		return nil
 	}
 	req.Body = http.MaxBytesReader(w, req.Body, 1048576)
@@ -59,46 +62,57 @@ func checkHeader(w http.ResponseWriter, req *http.Request) *json.Decoder {
 	return dec
 }
 
-func checkErr(err error, w http.ResponseWriter, message string) bool {
+func checkErr(err error, w http.ResponseWriter) bool {
+
 	if err != nil {
 		log.Println(err)                                  //to server
-		sendResponse(w, message)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return true
 	} else {
 		return false
 	}
 }
 
-func getRate(currency string, balance float64) float64{
+func getRate(currency string, balance float64, w http.ResponseWriter) float64{
+
 	response, err := http.Get("http://openexchangerates.org/api/latest.json?app_id="+APP_ID+"&symbols=RUB,"+currency) //would just change base but this option isn't for free :(
-	checkErr(err)
+	checkErr(err, w)
 	defer response.Body.Close()
 	body, err := ioutil.ReadAll(response.Body)
-	checkErr(err)
+	checkErr(err, w)
 
 	parseData := make(map[string]interface{})
 	err = json.Unmarshal([]byte(string(body)), &parseData)
-	checkErr(err)
 
-	for left, _ := range parseData {
-		if left == "rates" {
-			currencies := parseData["rates"].(map[string]interface{})
-			rateRub := currencies["RUB"].(float64)
-			rateCur := currencies[currency].(float64)
-			return balance/rateRub*rateCur
+	if !checkErr(err, w) {
+		for left, _ := range parseData {
+			if left == "rates" {
+				currencies := parseData["rates"].(map[string]interface{})
+				rateRub := currencies["RUB"].(float64)
+				rateCur := currencies[currency].(float64)
+				return balance / rateRub * rateCur
+			}
 		}
 	}
 	return -1.0
 }
 
 func readData(sign float64, dec *json.Decoder, db *sql.DB, w http.ResponseWriter) {
+
 	var req TransferRequest
-	checkErr(dec.Decode(&req))
-
-	id, _ := strconv.Atoi(req.UserID)                   //ошибки проверяются на уровне бд
-	sum, _ := strconv.ParseFloat(req.Sum, 64)
-
-	changeBankAccount(sum, sign, id, db, w, -1)
+	if !checkErr(dec.Decode(&req), w) {
+		id, err := strconv.Atoi(req.UserID)
+		if checkErr(err, w) || id <= 0  {
+			http.Error(w, "Id should be positive integer!", http.StatusNotFound)
+			return
+		}
+		sum, err := strconv.ParseFloat(req.Sum, 64)
+		if checkErr(err, w) || sum <= 0 {
+			http.Error(w, "Sum should have positive value!", http.StatusNotFound)
+			return
+		}
+		changeBankAccount(sum, sign, id, db, w, -1, req.Info)
+	}
 }
 
 func getReport(field string, table string, dec *json.Decoder, db *sql.DB, w http.ResponseWriter, sortBy string ) {
@@ -107,8 +121,14 @@ func getReport(field string, table string, dec *json.Decoder, db *sql.DB, w http
 	var sum, finalBalance float64
 	var created_at, info, req string
 	var fromOrToID int
-	checkErr(dec.Decode(&user))
-	id, _ := strconv.Atoi(user.UserID)
+	if checkErr(dec.Decode(&user), w) {
+		return
+	}
+	id, err := strconv.Atoi(user.UserID)
+	if checkErr(err, w) || id <= 0  {
+		http.Error(w, "Id should be positive integer!", http.StatusNotFound)
+		return
+	}
 	if sortBy!="" {
 		req = "select "+field+", sum, info, finalBalance, created_at from "+table+" where user = ? order by "+sortBy+ " desc;"
 	} else {
@@ -116,48 +136,50 @@ func getReport(field string, table string, dec *json.Decoder, db *sql.DB, w http
 	}
 
 	stmt, err := db.Query(req, id)
-	if !checkErr(err) {
-		fmt.Println("Report for user with id = ", id, ":")
+	if !checkErr(err, w) {
+		sendResponse(w, fmt.Sprintf("Report for user with id = %d with columns (fromOrToID, sum, info, finalBalance, creaed_at)", id))
+
 		for stmt.Next() {
 			err := stmt.Scan(&fromOrToID, &sum, &info, &finalBalance, &created_at)
-			checkErr(err)
-			fmt.Println(fromOrToID, sum, info, finalBalance, created_at)
+			checkErr(err, w)
 			sendResponse(w, fmt.Sprintf("%d %.2f %s %.2f %s", fromOrToID, sum, info, finalBalance, created_at))
 		}
 		stmt.Close()
 	}
 }
 
-func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.ResponseWriter, fromOrToID int) bool {
+func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.ResponseWriter, fromOrToID int, info string) bool {
 
 	var balance float64
-
 	stmt1, err1 := db.Prepare("update user set balance = ? where id = ? ;")
 	stmt2, err2 := db.Query("select balance from user where id = ? ;", id)
-	if !checkErr(err1) && !checkErr(err2) { //изменили баланс пользователя
+	if !checkErr(err1, w) && !checkErr(err2, w) {                      //изменили баланс пользователя
 		if stmt2.Next() {
 			err := stmt2.Scan(&balance)
-			checkErr(err)
+			checkErr(err, w)
 		}
 		stmt2.Close()
 		if balance+sign*sum < 0 {
-			log.Println("Balance can't be negative")
-			return true //error!
+			http.Error(w, "Balance can't be negative!", http.StatusNotFound)
+			return true                                                //error!
 		}
 		_, err := stmt1.Exec(balance+sign*sum, id)
-		if !checkErr(err) {
-			fmt.Println("Charged bank account for user with id = ", id)
-			sendResponse(w, strconv.Itoa(id))
+		if !checkErr(err, w) {
+			sendResponse(w, fmt.Sprintf("Charged bank account for user with id = %d", id))
+		} else {
+			return true
 		}
 		if sign > 0 {
-			stmt1, err1 = db.Prepare("insert into charge(sum, user, fromID, finalBalance) values( ? , ? , ? , ? );")
+			stmt1, err1 = db.Prepare("insert into charge(sum, user, fromID, finalBalance, info) values( ? , ? , ? , ? , ? );")
 		} else {
-			stmt1, err1 = db.Prepare("insert into writeOff(sum, user, toID, finalBalance) values( ? , ? , ? , ? );")
+			stmt1, err1 = db.Prepare("insert into writeOff(sum, user, toID, finalBalance, info) values( ? , ? , ? , ? , ? );")
 		}
-		checkErr(err1)
-		_, err1 = stmt1.Exec(sum, id, fromOrToID, balance+sign*sum)
-		checkErr(err1)
-		return false               //то есть ошибок нет
+		checkErr(err1, w)
+		_, err1 = stmt1.Exec(sum, id, fromOrToID, balance+sign*sum, info)
+		if !checkErr(err1, w) {
+			return false
+		}
+		return true
 	} else {
 		return true
 	}
@@ -165,7 +187,10 @@ func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.Res
 
 func requestsHandler(w http.ResponseWriter, req *http.Request) {
 	db, err := sql.Open("mysql", "user1:password1@/testdb")
-	checkErr(err)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Fatal(err.Error())
+	}
 	defer db.Close()
 
 	if req.Method == "POST"{
@@ -174,17 +199,16 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 			if req.URL.Path == "/users/add" {
 
 				var user User
-				checkErr(dec.Decode(&user))
+				checkErr(dec.Decode(&user), w)
 
 				stmt, err := db.Prepare("insert into user(username) values(?)")
-				checkErr(err)
+				checkErr(err, w)
 
 				res, err := stmt.Exec(user.Username)
-				if !checkErr(err) {
+				if !checkErr(err, w) {
 					id, err := res.LastInsertId()
-					checkErr(err)
-					fmt.Println("Created new user with id = ", id)
-					sendResponse(w, strconv.Itoa(int(id)))
+					checkErr(err, w)
+					sendResponse(w, fmt.Sprintf("%s %d", "Created new user with id =", id))
 				}
 
 			} else if req.URL.Path == "/users/charge" {
@@ -198,42 +222,50 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 			} else if req.URL.Path == "/users/transfer" {
 
 				var req TransferFromToRequest
-				checkErr(dec.Decode(&req))
+				checkErr(dec.Decode(&req), w)
 
 				id1, err1 := strconv.Atoi(req.FromID)
 				id2, err2 := strconv.Atoi(req.ToID)
-				if !checkErr(err1) && !checkErr(err2) {
-					if id1 == id2 {
-						log.Println("You can't tranfer money to your account!")
-						return
-					}
-					sum, _ := strconv.ParseFloat(req.Sum, 64)
+				if checkErr(err1, w) || checkErr(err2, w) || id1 <= 0 || id2 <= 0  {
+					http.Error(w, "Id should be positive integer!", http.StatusNotFound)
+					return
+				}
+				if id1 == id2 {
+					http.Error(w, "You can't tranfer money to your account!", http.StatusNotFound)
+					return
+				}
+				sum, _ := strconv.ParseFloat(req.Sum, 64)
 
-					if !changeBankAccount(sum, -1.0, id1, db, w, id2) {
-						changeBankAccount(sum, 1.0, id2, db, w, id1)
-					}
+				if !changeBankAccount(sum, -1.0, id1, db, w, id2, req.Info) {
+					changeBankAccount(sum, 1.0, id2, db, w, id1, req.Info)
 				}
 
 			} else if req.URL.Path == "/users/getBalance" {
 
 				var user UserID
 				var balance float64
-				checkErr(dec.Decode(&user))
-				id, _ := strconv.Atoi(user.UserID)
-
-				stmt, err := db.Query("select balance from user where id = ? ;", id)
-				if !checkErr(err) {
-					if stmt.Next() {
-						err := stmt.Scan(&balance)
-						checkErr(err)
-					}
-					stmt.Close()
+				checkErr(dec.Decode(&user), w)
+				id, err := strconv.Atoi(user.UserID)
+				if checkErr(err, w) || id <= 0  {
+					http.Error(w, "Id should be positive integer!", http.StatusNotFound)
+					return
 				}
 
-				fmt.Println("Balance of user with id = ", id, " is ", balance)
+				stmt, err := db.Query("select balance from user where id = ? ;", id)
+				if !checkErr(err, w) {
+					if stmt.Next() {
+						err := stmt.Scan(&balance)
+						checkErr(err, w)
+					}
+					stmt.Close()
+				} else {
+					return
+				}
+
+				sendResponse(w, fmt.Sprintf("Balance of user with id = %d is %.2f", id, balance))
+
 				if cur:=req.URL.Query().Get("currency"); cur!="" {                       //returns empty string if not found
-					convertedValue := getRate(cur, balance)
-					fmt.Println("Converted in "+cur+" = ", convertedValue)
+					convertedValue := getRate(cur, balance, w)
 					sendResponse(w, fmt.Sprintf("%.2f in %s is %.2f", balance, cur, convertedValue))
 				}
 
@@ -264,6 +296,8 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, "404 not found.\n", http.StatusNotFound)
 				return
 			}
+		} else {
+			http.Error(w, "Body is empty.\n", http.StatusNoContent)
 		}
 	} else {
 		http.Error(w, "Method is not supported.\n", http.StatusNotFound)
