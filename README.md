@@ -9,7 +9,7 @@ To use this app you need to install mysql server. Firstly install it with comman
     
 Then start a server and create user with specified domen and password:
 
-    udo service mysql start
+    sudo service mysql start
     mysql -u root -p                                                    #enter your root rassword
     create user 'user1'@'localhost' identified by 'password1';
     
