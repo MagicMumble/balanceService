@@ -42,7 +42,7 @@ type Response struct {
 
 func sendResponse(w http.ResponseWriter, text string) {
 
-	w.Header().Set("Content-Type", "application/json")        //вернёт id нового пользователя
+	w.Header().Set("Content-Type", "application/json")        //returns id of new user
 	data := Response {
 		Response: text,
 	}
@@ -65,7 +65,6 @@ func checkHeader(w http.ResponseWriter, req *http.Request) *json.Decoder {
 func checkErr(err error, w http.ResponseWriter) bool {
 
 	if err != nil {
-		log.Println(err)                                  //to server
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return true
 	} else {
@@ -130,9 +129,9 @@ func getReport(field string, table string, dec *json.Decoder, db *sql.DB, w http
 		return
 	}
 	if sortBy!="" {
-		req = "select "+field+", sum, info, finalBalance, created_at from "+table+" where user = ? order by "+sortBy+ " desc;"
+		req = "select " + field + ", sum, info, finalBalance, created_at from " + table + " where user = ? order by " + sortBy + " desc;"
 	} else {
-		req = "select "+field+", sum, info, finalBalance, created_at from "+table+" where user = ? ;"
+		req = "select " + field + ", sum, info, finalBalance, created_at from " + table + " where user = ? ;"
 	}
 
 	stmt, err := db.Query(req, id)
@@ -153,7 +152,7 @@ func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.Res
 	var balance float64
 	stmt1, err1 := db.Prepare("update user set balance = ? where id = ? ;")
 	stmt2, err2 := db.Query("select balance from user where id = ? ;", id)
-	if !checkErr(err1, w) && !checkErr(err2, w) {                      //изменили баланс пользователя
+	if !checkErr(err1, w) && !checkErr(err2, w) {                                               //changing user balance
 		if stmt2.Next() {
 			err := stmt2.Scan(&balance)
 			checkErr(err, w)
@@ -161,7 +160,7 @@ func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.Res
 		stmt2.Close()
 		if balance+sign*sum < 0 {
 			http.Error(w, "Balance can't be negative!", http.StatusNotFound)
-			return true                                                //error!
+			return true                                                                   //return error
 		}
 		_, err := stmt1.Exec(balance+sign*sum, id)
 		if !checkErr(err, w) {
