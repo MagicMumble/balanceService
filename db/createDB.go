@@ -40,15 +40,8 @@ func main() {
 		log.Fatal(err.Error())
 	}
 	defer db.Close()
-	deleteDbs(db)
+	//deleteDbs(db)                              //uncomment to recreate tables or change their structure
 	createDbs(db)
 }
-
-//sudo apt-get install mysql-community-server
-//sudo service mysql start
-//mysql -u root -p (entering pass)
-// create user 'user1'@'localhost' identified by 'password1';
-//create database testdb;
-// grant all on testdb.* to 'user1';
 
 
