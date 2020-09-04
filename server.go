@@ -42,7 +42,7 @@ type Response struct {
 
 func sendResponse(w http.ResponseWriter, text string) {
 
-	w.Header().Set("Content-Type", "application/json")        //returns id of new user
+	w.Header().Set("Content-Type", "application/json")
 	data := Response {
 		Response: text,
 	}
@@ -136,7 +136,7 @@ func getReport(field string, table string, dec *json.Decoder, db *sql.DB, w http
 
 	stmt, err := db.Query(req, id)
 	if !checkErr(err, w) {
-		sendResponse(w, fmt.Sprintf("Report for user with id = %d with columns (fromOrToID, sum, info, finalBalance, creaed_at)", id))
+		sendResponse(w, fmt.Sprintf("Report for user with id = %d with columns (fromOrToID, sum, info, finalBalance, created_at)", id))
 
 		for stmt.Next() {
 			err := stmt.Scan(&fromOrToID, &sum, &info, &finalBalance, &created_at)
@@ -152,10 +152,13 @@ func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.Res
 	var balance float64
 	stmt1, err1 := db.Prepare("update user set balance = ? where id = ? ;")
 	stmt2, err2 := db.Query("select balance from user where id = ? ;", id)
-	if !checkErr(err1, w) && !checkErr(err2, w) {                                               //changing user balance
+	if !checkErr(err1, w) && !checkErr(err2, w) {                 //changing user balance
 		if stmt2.Next() {
 			err := stmt2.Scan(&balance)
 			checkErr(err, w)
+		} else {
+			http.Error(w, fmt.Sprintf("There is no user with id %d!", id), http.StatusNotFound)
+			return true
 		}
 		stmt2.Close()
 		if balance+sign*sum < 0 {
@@ -163,9 +166,7 @@ func changeBankAccount(sum float64, sign float64, id int, db *sql.DB, w http.Res
 			return true                                                                   //return error
 		}
 		_, err := stmt1.Exec(balance+sign*sum, id)
-		if !checkErr(err, w) {
-			sendResponse(w, fmt.Sprintf("Charged bank account for user with id = %d", id))
-		} else {
+		if checkErr(err, w) {
 			return true
 		}
 		if sign > 0 {
@@ -234,9 +235,18 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 					return
 				}
 				sum, _ := strconv.ParseFloat(req.Sum, 64)
+				if checkErr(err, w) || sum <= 0 {
+					http.Error(w, "Sum should have positive value!", http.StatusNotFound)
+					return
+				}
+
+				//если нет отправителя, то ничего не произойдёт. Если отправитель есть, но нет получателя, то деньги со счёта отправителя сначала снимутся,
+				//а потом вернутся с соответствующим комментарием
 
 				if !changeBankAccount(sum, -1.0, id1, db, w, id2, req.Info) {
-					changeBankAccount(sum, 1.0, id2, db, w, id1, req.Info)
+					if changeBankAccount(sum, 1.0, id2, db, w, id1, req.Info) {
+						changeBankAccount(sum, 1.0, id1, db, w, -1, req.Info+". No getter. Money returned back")
+					}
 				}
 
 			} else if req.URL.Path == "/users/getBalance" {
@@ -255,6 +265,9 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 					if stmt.Next() {
 						err := stmt.Scan(&balance)
 						checkErr(err, w)
+					} else {
+						http.Error(w, fmt.Sprintf("There is no user with id %d!", id), http.StatusNotFound)
+						return
 					}
 					stmt.Close()
 				} else {
@@ -263,9 +276,9 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 
 				sendResponse(w, fmt.Sprintf("Balance of user with id = %d is %.2f", id, balance))
 
-				if cur:=req.URL.Query().Get("currency"); cur!="" {                       //returns empty string if not found
+				if cur:=req.URL.Query().Get("currency"); cur!="" {                                     //returns empty string if not found
 					convertedValue := getRate(cur, balance, w)
-					sendResponse(w, fmt.Sprintf("%.2f in %s is %.2f", balance, cur, convertedValue))
+					sendResponse(w, fmt.Sprintf("%.2f RUB in %s is %.2f", balance, cur, convertedValue))
 				}
 
 			} else if req.URL.Path == "/users/getChargeReport" {
@@ -292,7 +305,7 @@ func requestsHandler(w http.ResponseWriter, req *http.Request) {
 					getReport("toID", "writeOff", dec, db, w, "")
 				}
 			} else {
-				http.Error(w, "404 not found.\n", http.StatusNotFound)
+				http.Error(w, "URL path is not found.\n", http.StatusNotFound)
 				return
 			}
 		} else {
