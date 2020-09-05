@@ -92,3 +92,9 @@ Let's take a look at the API methods of this app. Request for adding new user:
      --request POST \
      --data '{"userID": "1"}' \
      http://localhost:9000/users/getWriteOffReport?sort=date
+     
+ To build the app using docker you need to enter following commands:
+ 
+    sudo service docker start
+    DOCKER_HOST=127.0.0.1
+    sudo docker-compose up --build                      # docker doesn't rebuild the image by itself
