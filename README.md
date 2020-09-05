@@ -97,4 +97,10 @@ Let's take a look at the API methods of this app. Request for adding new user:
  
     sudo service docker start
     DOCKER_HOST=127.0.0.1
-    sudo docker-compose up --build                      # docker doesn't rebuild the image by itself
+    sudo docker-compose up 
+    
+Docker doesn't rebuild the image by itself so if you need to rebuild your app add the flag --build:
+
+    sudo docker-compose up --build                      
+
+
