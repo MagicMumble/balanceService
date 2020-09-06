@@ -29,6 +29,8 @@ To be able to get currency rates from page `https://exchangeratesapi.io/` and co
 Run the server from `balanceService`:
 
     go build server.go && ./server
+    
+#Application API
 
 Let's take a look at the API methods of this app. Request for adding new user:
     
@@ -92,15 +94,26 @@ Let's take a look at the API methods of this app. Request for adding new user:
      --request POST \
      --data '{"userID": "1"}' \
      http://localhost:9000/users/getWriteOffReport?sort=date
-     
- To build the app using docker you need to enter following commands:
- 
+    
+# Building project with Docker-compose
+
+First thing you need to do is to stop your local installed mysql instance with the command:
+
+    sudo service mysql stop
+    
+Otherwise the port :3306 will be in use and you won't be able to connect to it. Then try to build the app using docker-compose:
+
     sudo service docker start
     DOCKER_HOST=127.0.0.1
-    sudo docker-compose up 
+    sudo docker-compose up
     
+Once we have MySQL container up (with the name `golang_db_avito`) and running next thing we need to do is to find out its IP address. 
+
+    docker inspect golang_db_avito | grep IPAddr
+    
+This IP address you need to set in the golang file (`server.go`) while conneting to database. Don't forget to fill environment variable `MYSQL_ROOT_PASSWORD` with your own root pasword. 
+
 Docker doesn't rebuild the image by itself so if you need to rebuild your app add the flag --build:
 
-    sudo docker-compose up --build                      
-
+    sudo docker-compose up --build
 
