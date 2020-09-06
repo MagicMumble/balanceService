@@ -111,7 +111,7 @@ Once we have MySQL container up (with the name `golang_db_avito`) and running ne
 
     docker inspect golang_db_avito | grep IPAddr
     
-This IP address you need to set in the golang file (`server.go`) while conneting to database. Don't forget to fill environment variable `MYSQL_ROOT_PASSWORD` with your own root pasword. 
+This IP address you need to set in the golang file (`server.go`) while conneting to database. Don't forget to fill environment variable `MYSQL_ROOT_PASSWORD` in your `docker-compose.yml` file with your own root pasword. 
 
 Docker doesn't rebuild the image by itself so if you need to rebuild your app add the flag --build:
 
