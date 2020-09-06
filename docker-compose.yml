@@ -1,0 +1,23 @@
+version: '2'
+services:
+  db:
+    build:
+      context: ./db
+    environment:
+      MYSQL_ROOT_PASSWORD: 250599anya               #enter your own root password!
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: user1
+      MYSQL_PASSWORD: password1
+    container_name: golang_db_avito
+    ports:
+    - "3306:3306"
+  app:
+    build:
+      context: ./Go
+    volumes:
+    - "./Go:/go"
+    container_name: golang_app_avito
+    ports:
+    - "9000:9000"
+    depends_on:
+    - db
