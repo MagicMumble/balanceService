@@ -30,7 +30,7 @@ Run the server from `balanceService`:
 
     go build server.go && ./server
     
-#Application API
+# Application API
 
 Let's take a look at the API methods of this app. Request for adding new user:
     
