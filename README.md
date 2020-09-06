@@ -18,15 +18,15 @@ Last step is creating your databse and grant all access to the user:
     create database testdb;
     grant all on testdb.* to 'user1';
     
-To create tables inside new database run file `createDB.go` from `balanceService/db`:
+To create tables inside new database run file `createDB.go` from current directory:
 
     go build createDB.go && ./createDB
     
-To be able to get currency rates from page `https://exchangeratesapi.io/` and convert balance you need to register there and get the KEY (visit page `page https://openexchangerates.org/signup`). To use mySql driver in go program install "github.com/go-sql-driver/mysql" with the command:
+To be able to get currency rates from page `https://exchangeratesapi.io/` and convert balance you need to register there and get the KEY (visit page `https://openexchangerates.org/signup`). To use mySql driver in go program install "github.com/go-sql-driver/mysql" with the command:
 
     go get -u "github.com/go-sql-driver/mysql"
 
-Run the server from `balanceService`:
+Run the server from `balanceService/Go`:
 
     go build server.go && ./server
     
@@ -101,13 +101,13 @@ First thing you need to do is to stop your local installed mysql instance with t
 
     sudo service mysql stop
     
-Otherwise the port :3306 will be in use and you won't be able to connect to it. Then try to build the app using docker-compose:
+Otherwise the port :3306 (default port) will be in use and you won't be able to connect to it. Then try to build the app using docker-compose:
 
     sudo service docker start
     DOCKER_HOST=127.0.0.1
     sudo docker-compose up
     
-Once we have MySQL container up (with the name `golang_db_avito`) and running next thing we need to do is to find out its IP address. 
+Once we have MySQL container up and running (with the name `golang_db_avito`) next thing we need to do is to find out its IP address. 
 
     docker inspect golang_db_avito | grep IPAddr
     
